@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Speech → Sign Mode</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+
+body{
+font-family:'Segoe UI',sans-serif;
+background:#EBF2FF;
+min-height:100vh;
+color:#1a1a2e;
+}
+
+/* Toast */
+.toast-box{
+position:fixed;
+top:20px;right:20px;
+z-index:9999;
+display:flex;
+flex-direction:column;
+gap:10px;
+max-width:320px;
+}
+
+.toast{
+padding:12px 16px;
+border-radius:10px;
+font-size:.82rem;
+font-weight:600;
+display:flex;
+align-items:center;
+gap:8px;
+color:#fff;
+box-shadow:0 6px 24px rgba(0,0,0,.15);
+transform:translateX(120%);
+transition:transform .4s ease;
+cursor:pointer;
+position:relative;
+}
+
+.toast.show{transform:translateX(0)}
+.toast-info{background:#1a56db}
+.toast-success{background:#15803d}
+.toast-error{background:#b91c1c}
+.toast-warning{background:#b45309}
+.toast-recording{background:#dc2626}
+
+.toast-close{
+margin-left:auto;
+background:rgba(255,255,255,.2);
+border:none;color:#fff;
+width:20px;height:20px;
+border-radius:50%;
+cursor:pointer;
+font-size:.65rem;
+}
+
+.toast-bar{
+position:absolute;
+bottom:0;left:0;
+height:3px;
+background:rgba(255,255,255,.4);
+border-radius:0 0 10px 10px;
+animation:tbar 3s linear forwards;
+}
+
+@keyframes tbar{
+from{width:100%}
+to{width:0}
+}
+
+/* Header */
+.header{
+text-align:center;
+padding:28px 20px 8px;
+}
+
+.header h1{
+font-size:1.5rem;
+color:#1a1a2e;
+margin-bottom:4px;
+}
+
+.header p{
+color:#5a6478;
+font-size:.85rem;
+}
+
+/* Container */
+.container{
+max-width:480px;
+margin:0 auto;
+padding:16px;
+display:flex;
+flex-direction:column;
+gap:16px;
+padding-bottom:40px;
+}
+
+/* Card */
+.card{
+background:#fff;
+border:1px solid #d6e0f0;
+border-radius:14px;
+padding:20px;
+transition:box-shadow .3s;
+}
+
+.card:hover{
+box-shadow:0 4px 16px rgba(26,86,219,.07);
+}
+
+.label{
+font-size:.65rem;
+text-transform:uppercase;
+letter-spacing:2px;
+color:#7a8aa8;
+margin-bottom:12px;
+}
+
+/* Mic */
+.mic-area{
+display:flex;
+flex-direction:column;
+align-items:center;
+gap:14px;
+}
+
+.mic-btn{
+width:84px;height:84px;
+border-radius:50%;
+border:2px solid #1a56db;
+background:#EBF2FF;
+cursor:pointer;
+display:flex;
+align-items:center;
+justify-content:center;
+position:relative;
+transition:all .3s;
+}
+
+.mic-btn:hover{
+background:#dbe6fc;
+}
+
+.mic-btn.on{
+border-color:#dc2626;
+background:#fef2f2;
+}
+
+.mic-btn svg{
+width:30px;height:30px;
+fill:#1a56db;
+z-index:2;
+transition:fill .3s;
+}
+
+.mic-btn.on svg{fill:#dc2626}
+
+.rings{
+position:absolute;
+width:100%;height:100%;
+border-radius:50%;
+}
+
+.rings .r{
+position:absolute;
+top:50%;left:50%;
+transform:translate(-50%,-50%);
+border-radius:50%;
+border:2px solid rgba(220,38,38,.25);
+opacity:0;
+pointer-events:none;
+}
+
+.mic-btn.on .r{
+animation:rpl 2s infinite;
+}
+
+.mic-btn.on .r:nth-child(2){
+animation-delay:.5s;
+}
+
+.mic-btn.on .r:nth-child(3){
+animation-delay:1s;
+}
+
+@keyframes rpl{
+0%{width:100%;height:100%;opacity:.5}
+100%{width:200%;height:200%;opacity:0}
+}
+
+/* Waveform */
+.wave{
+display:flex;
+align-items:center;
+gap:3px;height:30px;
+opacity:0;
+transition:opacity .3s;
+}
+
+.wave.on{opacity:1}
+
+.wave .b{
+width:3px;
+background:#dc2626;
+border-radius:3px;
+animation:wv .8s ease-in-out
+infinite alternate;
+}
+
+.wave .b:nth-child(1){height:8px}
+.wave .b:nth-child(2){
+height:18px;animation-delay:.1s}
+.wave .b:nth-child(3){
+height:26px;animation-delay:.2s}
+.wave .b:nth-child(4){
+height:12px;animation-delay:.3s}
+.wave .b:nth-child(5){
+height:28px;animation-delay:.4s}
+.wave .b:nth-child(6){
+height:18px;animation-delay:.5s}
+.wave .b:nth-child(7){
+height:14px;animation-delay:.6s}
+.wave .b:nth-child(8){
+height:22px;animation-delay:.3s}
+
+@keyframes wv{
+0%{transform:scaleY(.3)}
+100%{transform:scaleY(1)}
+}
+
+.prompt{
+font-size:.82rem;
+color:#7a8aa8;
+text-align:center;
+transition:all .3s;
+}
+
+.prompt.on{
+color:#dc2626;
+font-weight:600;
+}
+
+/* Status */
+.stat{
+display:flex;
+align-items:center;
+gap:8px;
+padding:9px 12px;
+border-radius:8px;
+font-size:.78rem;
+font-weight:500;
+opacity:0;
+transform:translateY(6px);
+transition:all .4s;
+}
+
+.stat.show{
+opacity:1;
+transform:translateY(0);
+}
+
+.stat.proc{
+background:#fef2f2;
+border:1px solid #fecaca;
+color:#dc2626;
+}
+
+.stat.ok{
+background:#f0fdf4;
+border:1px solid #bbf7d0;
+color:#15803d;
+}
+
+.stat.err{
+background:#fef2f2;
+border:1px solid #fecaca;
+color:#b91c1c;
+}
+
+.spin{
+width:13px;height:13px;
+border:2px solid #fecaca;
+border-top-color:#dc2626;
+border-radius:50%;
+animation:sp .8s linear infinite;
+flex-shrink:0;
+}
+
+@keyframes sp{to{transform:rotate(360deg)}}
+
+.stats{
+display:flex;
+flex-direction:column;
+gap:6px;width:100%;
+margin-top:4px;
+}
+
+/* Transcription */
+.t-head{
+display:flex;
+align-items:center;
+justify-content:space-between;
+margin-bottom:10px;
+}
+
+.t-title{
+font-size:.95rem;
+font-weight:600;
+color:#1a1a2e;
+}
+
+.live{
+display:flex;
+align-items:center;
+gap:4px;
+font-size:.6rem;
+color:#dc2626;
+text-transform:uppercase;
+letter-spacing:1px;
+font-weight:700;
+opacity:0;
+transition:opacity .3s;
+}
+
+.live.on{opacity:1}
+
+.live-d{
+width:6px;height:6px;
+background:#dc2626;
+border-radius:50%;
+animation:pd 1.5s infinite;
+}
+
+@keyframes pd{
+0%,100%{opacity:1}
+50%{opacity:.3}
+}
+
+.t-box{
+background:#f8faff;
+border:1px solid #d6e0f0;
+border-radius:10px;
+padding:12px;
+min-height:80px;
+transition:border-color .3s;
+}
+
+.t-box:focus-within{
+border-color:#1a56db;
+}
+
+.t-area{
+width:100%;
+min-height:55px;
+background:transparent;
+border:none;
+color:#1a1a2e;
+font-size:.88rem;
+line-height:1.6;
+resize:none;
+outline:none;
+font-family:inherit;
+}
+
+.t-area::placeholder{color:#a0aec0}
+
+.t-foot{
+display:flex;
+align-items:center;
+justify-content:space-between;
+margin-top:8px;
+}
+
+.t-status{
+font-size:.72rem;
+color:#a0aec0;
+display:flex;
+align-items:center;
+gap:5px;
+opacity:0;
+transition:opacity .3s;
+}
+
+.t-status.on{
+opacity:1;color:#dc2626;
+}
+
+.sp-s{
+width:11px;height:11px;
+border:2px solid #fecaca;
+border-top-color:#dc2626;
+border-radius:50%;
+animation:sp .8s linear infinite;
+}
+
+.hint{font-size:.68rem;color:#7a8aa8}
+.chars{font-size:.68rem;color:#a0aec0}
+
+/* Grammar */
+.g-title{
+font-size:.95rem;
+font-weight:600;
+margin-bottom:12px;
+color:#1a1a2e;
+}
+
+.modes{
+display:flex;
+background:#f0f4ff;
+border-radius:8px;
+padding:3px;gap:3px;
+margin-bottom:10px;
+}
+
+.mode{
+flex:1;padding:8px;
+border:none;
+border-radius:6px;
+background:transparent;
+color:#7a8aa8;
+font-size:.78rem;
+font-weight:600;
+cursor:pointer;
+transition:all .3s;
+}
+
+.mode.on{
+background:#1a56db;
+color:#fff;
+}
+
+.m-sel{
+display:flex;
+align-items:center;
+gap:7px;
+padding:8px 12px;
+background:#f0f4ff;
+border:1px solid #d6e0f0;
+border-radius:8px;
+font-size:.78rem;
+font-weight:500;
+color:#1a56db;
+margin-bottom:12px;
+}
+
+.cvt-btn{
+width:100%;
+padding:12px;
+background:#1a56db;
+border:none;
+border-radius:10px;
+color:#fff;
+font-size:.82rem;
+font-weight:600;
+cursor:pointer;
+display:flex;
+align-items:center;
+justify-content:center;
+gap:7px;
+transition:all .2s;
+margin-bottom:10px;
+}
+
+.cvt-btn:hover{background:#1544b8}
+.cvt-btn:active{transform:scale(.98)}
+.cvt-btn svg{fill:#fff}
+
+.c-stat{
+display:flex;
+align-items:center;
+gap:8px;
+padding:9px 12px;
+border-radius:8px;
+font-size:.78rem;
+font-weight:500;
+opacity:0;
+transform:translateY(4px);
+transition:all .4s;
+}
+
+.c-stat.show{
+opacity:1;
+transform:translateY(0);
+}
+
+.c-stat.cvting{
+background:#f0f4ff;
+border:1px solid #d6e0f0;
+color:#1a56db;
+}
+
+.c-stat.done{
+background:#f0fdf4;
+border:1px solid #bbf7d0;
+color:#15803d;
+}
+
+.sp-b{
+width:13px;height:13px;
+border:2px solid #d6e0f0;
+border-top-color:#1a56db;
+border-radius:50%;
+animation:sp .8s linear infinite;
+}
+
+.s-out{
+margin-top:8px;
+padding:12px;
+background:#f8faff;
+border:1px solid #d6e0f0;
+border-radius:8px;
+display:none;
+}
+
+.s-out.show{display:block}
+
+.s-lbl{
+font-size:.6rem;
+color:#7a8aa8;
+text-transform:uppercase;
+letter-spacing:1px;
+margin-bottom:5px;
+}
+
+.s-txt{
+font-size:.9rem;
+color:#1a1a2e;
+font-weight:600;
+line-height:1.5;
+}
+
+/* Avatar */
+.av-title{
+font-size:.95rem;
+font-weight:600;
+margin-bottom:12px;
+color:#1a1a2e;
+}
+
+.av-box{
+background:#f0f4ff;
+border:1px solid #d6e0f0;
+border-radius:12px;
+height:230px;
+display:flex;
+align-items:center;
+justify-content:center;
+margin-bottom:10px;
+}
+
+.av-wrap{
+display:flex;
+flex-direction:column;
+align-items:center;
+gap:8px;
+}
+
+.av{
+width:75px;height:135px;
+position:relative;
+}
+
+.av .hd{
+width:28px;height:28px;
+background:#6b9fff;
+border-radius:50%;
+margin:0 auto 2px;
+position:relative;
+}
+
+.av .hd::before{
+content:'';
+position:absolute;
+top:9px;left:6px;
+width:4px;height:4px;
+background:#fff;
+border-radius:50%;
+box-shadow:12px 0 0 #fff;
+}
+
+.av .hd::after{
+content:'';
+position:absolute;
+bottom:6px;
+left:50%;
+transform:translateX(-50%);
+width:9px;height:3px;
+background:#fff;
+border-radius:3px;
+}
+
+.av .nk{
+width:9px;height:7px;
+background:#6b9fff;
+margin:0 auto;
+}
+
+.av .tr{
+width:36px;height:38px;
+background:#4a85f0;
+border-radius:7px 7px 3px 3px;
+margin:0 auto;
+}
+
+.av .al,.av .ar{
+width:9px;height:36px;
+background:#5a94f5;
+border-radius:5px;
+position:absolute;
+top:38px;
+transform-origin:top center;
+}
+
+.av .al{left:4px;transform:rotate(12deg)}
+.av .ar{right:4px;transform:rotate(-12deg)}
+
+.av .hl,.av .hr{
+width:11px;height:11px;
+background:#6b9fff;
+border-radius:50%;
+position:absolute;top:72px;
+}
+
+.av .hl{left:2px}
+.av .hr{right:2px}
+
+.av .ll,.av .lr{
+width:11px;height:32px;
+background:#3a6fd8;
+border-radius:4px;
+position:absolute;bottom:0;
+}
+
+.av .ll{left:17px}
+.av .lr{right:17px}
+
+.av.go .al{
+animation:sl 1.2s ease-in-out infinite;
+}
+
+.av.go .ar{
+animation:sr 1.2s ease-in-out
+infinite .2s;
+}
+
+.av.go .hl{
+animation:hlm 1.2s ease-in-out infinite;
+}
+
+.av.go .hr{
+animation:hrm 1.2s ease-in-out
+infinite .2s;
+}
+
+.av.go .hd{
+animation:hn 2s ease-in-out infinite;
+}
+
+@keyframes sl{
+0%,100%{transform:rotate(12deg)}
+25%{transform:rotate(-40deg)
+translateY(-5px)}
+50%{transform:rotate(-15deg)}
+75%{transform:rotate(-55deg)
+translateY(-8px)}
+}
+
+@keyframes sr{
+0%,100%{transform:rotate(-12deg)}
+25%{transform:rotate(25deg)
+translateY(-6px)}
+50%{transform:rotate(50deg)
+translateY(-10px)}
+75%{transform:rotate(15deg)}
+}
+
+@keyframes hlm{
+0%,100%{transform:translate(0,0)}
+25%{transform:translate(-12px,-18px)}
+50%{transform:translate(-5px,-10px)}
+75%{transform:translate(-18px,-25px)}
+}
+
+@keyframes hrm{
+0%,100%{transform:translate(0,0)}
+25%{transform:translate(10px,-15px)}
+50%{transform:translate(18px,-22px)}
+75%{transform:translate(6px,-8px)}
+}
+
+@keyframes hn{
+0%,100%{transform:rotate(0)}
+25%{transform:rotate(-3deg)}
+75%{transform:rotate(3deg)}
+}
+
+.av-st{
+font-size:.78rem;
+color:#7a8aa8;
+font-weight:500;
+}
+
+.pl-st{
+display:none;
+align-items:center;
+gap:7px;
+padding:8px 12px;
+background:#f0f4ff;
+border:1px solid #d6e0f0;
+border-radius:8px;
+font-size:.78rem;
+font-weight:500;
+color:#1a56db;
+margin-bottom:10px;
+}
+
+.pl-st.show{display:flex}
+
+.pl-bars{
+display:flex;gap:2px;
+align-items:flex-end;
+height:11px;
+}
+
+.pl-bars .pb{
+width:3px;
+background:#1a56db;
+border-radius:2px;
+animation:plb .6s ease-in-out
+infinite alternate;
+}
+
+.pl-bars .pb:nth-child(1){height:5px}
+.pl-bars .pb:nth-child(2){
+height:9px;animation-delay:.1s}
+.pl-bars .pb:nth-child(3){
+height:4px;animation-delay:.2s}
+.pl-bars .pb:nth-child(4){
+height:11px;animation-delay:.3s}
+
+@keyframes plb{
+0%{transform:scaleY(.5)}
+100%{transform:scaleY(1.2)}
+}
+
+.ctrls{
+display:flex;
+gap:7px;
+margin-bottom:12px;
+}
+
+.ctrl{
+flex:1;padding:10px;
+border:1px solid #d6e0f0;
+border-radius:8px;
+background:#fff;
+color:#5a6478;
+font-size:.78rem;
+font-weight:500;
+cursor:pointer;
+display:flex;
+align-items:center;
+justify-content:center;
+gap:5px;
+transition:all .2s;
+}
+
+.ctrl:hover{
+background:#f0f4ff;
+border-color:#b3c6e8;
+}
+
+.ctrl:active{
+background:#1a56db;
+border-color:#1a56db;
+color:#fff;
+transform:scale(.97);
+}
+
+.ctrl.act{
+background:#1a1a2e;
+border-color:#1a1a2e;
+color:#fff;
+}
+
+.ctrl svg{
+width:14px;height:14px;
+fill:currentColor;
+}
+
+/* Speed */
+.spd{
+background:#f8faff;
+border:1px solid #d6e0f0;
+border-radius:10px;
+padding:12px 14px;
+}
+
+.spd-h{
+display:flex;
+align-items:center;
+justify-content:space-between;
+margin-bottom:8px;
+}
+
+.spd-l{
+font-size:.78rem;
+color:#5a6478;
+font-weight:500;
+}
+
+.spd-v{
+font-size:.78rem;
+color:#1a56db;
+font-weight:700;
+background:#e8efff;
+padding:2px 9px;
+border-radius:5px;
+}
+
+.slider{
+-webkit-appearance:none;
+appearance:none;
+width:100%;height:5px;
+background:#d6e0f0;
+border-radius:3px;
+outline:none;
+cursor:pointer;
+transition:background .2s;
+}
+
+.slider:active{background:#b3c6e8}
+
+.slider::-webkit-slider-thumb{
+-webkit-appearance:none;
+width:20px;height:20px;
+background:#1a56db;
+border-radius:50%;
+cursor:pointer;
+transition:all .2s;
+box-shadow:0 2px 6px
+rgba(26,86,219,.3);
+}
+
+.slider:active::-webkit-slider-thumb{
+background:#0f3a8e;
+transform:scale(1.25);
+box-shadow:0 4px 12px
+rgba(26,86,219,.5);
+}
+
+.slider::-moz-range-thumb{
+width:20px;height:20px;
+background:#1a56db;
+border-radius:50%;
+cursor:pointer;border:none;
+}
+
+.spd-m{
+display:flex;
+justify-content:space-between;
+margin-top:5px;
+}
+
+.spd-m span{
+font-size:.58rem;
+color:#a0aec0;
+}
+
+/* Steps */
+.steps{
+display:flex;
+align-items:center;
+justify-content:center;
+gap:5px;
+padding:12px 0 4px;
+}
+
+.stp{
+width:26px;height:26px;
+border-radius:50%;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:.6rem;
+font-weight:700;
+transition:all .3s;
+}
+
+.stp.dn{
+background:#1a56db;
+border:2px solid #1a56db;
+color:#fff;
+}
+
+.stp.cur{
+background:#fff;
+border:2px solid #1a56db;
+color:#1a56db;
+}
+
+.stp.nx{
+background:#fff;
+border:2px solid #d6e0f0;
+color:#a0aec0;
+}
+
+.sln{
+width:22px;height:2px;
+border-radius:1px;
+transition:background .3s;
+}
+
+.sln.dn{background:#1a56db}
+.sln.pd{background:#d6e0f0}
+
+@media(max-width:480px){
+.container{padding:12px}
+.header h1{font-size:1.2rem}
+.card{padding:16px}
+.av-box{height:190px}
+.toast-box{
+top:auto;bottom:16px;
+right:8px;left:8px;
+max-width:none;
+}
+}
+</style>
+</head>
+<body>
+
+<div class="toast-box" id="tBox"></div>
+
+<div class="header">
+<h1>Speech → Sign Mode</h1>
+<p>Convert spoken words into sign language</p>
+</div>
+
+<div class="steps">
+<div class="stp cur" id="s1">1</div>
+<div class="sln pd" id="l1"></div>
+<div class="stp nx" id="s2">2</div>
+<div class="sln pd" id="l2"></div>
+<div class="stp nx" id="s3">3</div>
+<div class="sln pd" id="l3"></div>
+<div class="stp nx" id="s4">4</div>
+</div>
+
+<div class="container">
+
+<!-- MIC -->
+<div class="card">
+<div class="label">Microphone</div>
+<div class="mic-area">
+
+<button class="mic-btn" id="mic"
+onclick="toggleMic()">
+<div class="rings">
+<div class="r"></div>
+<div class="r"></div>
+<div class="r"></div>
+</div>
+<svg viewBox="0 0 24 24">
+<path d="M12 14c1.66 0 3-1.34
+3-3V5c0-1.66-1.34-3-3-3S9
+3.34 9 5v6c0 1.66 1.34 3 3 3z
+m-1-9c0-.55.45-1 1-1s1 .45
+1 1v6c0 .55-.45 1-1 1s-1-.45
+-1-1V5z"/>
+<path d="M17 11c0 2.76-2.24
+5-5 5s-5-2.24-5-5H5c0 3.53
+2.61 6.43 6 6.92V21h2v-3.08
+c3.39-.49 6-3.39 6-6.92h-2z"/>
+</svg>
+</button>
+
+<div class="wave" id="wav">
+<div class="b"></div>
+<div class="b"></div>
+<div class="b"></div>
+<div class="b"></div>
+<div class="b"></div>
+<div class="b"></div>
+<div class="b"></div>
+<div class="b"></div>
+</div>
+
+<p class="prompt" id="prm">
+Tap the microphone to start speaking
+</p>
+
+<div class="stats">
+<div class="stat proc" id="mLis">
+<div class="spin"></div>Listening…
+</div>
+<div class="stat proc" id="mPro">
+<div class="spin"></div>Processing speech…
+</div>
+<div class="stat ok" id="mOk">
+✓ Speech detected successfully
+</div>
+<div class="stat err" id="mErr">
+✕ No speech detected. Try again.
+</div>
+</div>
+
+</div>
+</div>
+
+<!-- TRANSCRIPTION -->
+<div class="card">
+<div class="label">Transcription</div>
+<div class="t-head">
+<div class="t-title">
+Live Transcription
+</div>
+<div class="live" id="liv">
+<div class="live-d"></div>LIVE
+</div>
+</div>
+
+<div class="t-box">
+<textarea class="t-area" id="tTxt"
+placeholder="Speech appears here…"
+oninput="uCC()"></textarea>
+</div>
+
+<div class="t-foot">
+<div class="t-status" id="tSt">
+<div class="sp-s"></div>
+Transcribing in real time…
+</div>
+<div class="hint">
+Edit text before converting
+</div>
+</div>
+
+<div style="text-align:right;
+margin-top:3px">
+<span class="chars" id="cc">
+0 characters
+</span>
+</div>
+</div>
+
+<!-- GRAMMAR -->
+<div class="card">
+<div class="label">Grammar Conversion</div>
+<div class="g-title">
+Sign Language Structure
+</div>
+
+<div class="modes">
+<button class="mode on" id="ksl"
+onclick="selMode('KSL')">KSL</button>
+<button class="mode" id="asl"
+onclick="selMode('ASL')">ASL</button>
+</div>
+
+<div class="m-sel">
+✓ <span id="mTxt">KSL Mode Selected</span>
+</div>
+
+<button class="cvt-btn"
+onclick="convert()">
+<svg width="15" height="15"
+viewBox="0 0 24 24">
+<path d="M12.87 15.07l-2.54-2.51
+.03-.03A17.52 17.52 0 0014.07
+6H17V4h-7V2H8v2H1v2h11.17C11.5
+7.92 10.44 9.75 9 11.35 8.07
+10.32 7.3 9.19 6.69 8h-2c.73
+1.63 1.73 3.17 2.98 4.56l-5.09
+5.02L4 19l5-5 3.11 3.11.76
+-2.04zM18.5 10h-2L12 22h2l1.12
+-3h4.75L21 22h2l-4.5-12zm-2.62
+7l1.62-4.33L19.12 17h-3.24z"/>
+</svg>
+Convert to Sign Structure
+</button>
+
+<div class="c-stat cvting" id="cIng">
+<div class="sp-b"></div>
+Converting to Sign Structure…
+</div>
+
+<div class="c-stat done" id="cDone">
+✓ Sign-ready sentence generated
+</div>
+
+<div class="s-out" id="sOut">
+<div class="s-lbl">Sign-Ready Output</div>
+<div class="s-txt" id="sTxt"></div>
+</div>
+</div>
+
+<!-- AVATAR -->
+<div class="card">
+<div class="label">Avatar Output</div>
+<div class="av-title">Sign Output</div>
+
+<div class="av-box">
+<div class="av-wrap">
+<div class="av" id="avF">
+<div class="hd"></div>
+<div class="nk"></div>
+<div class="al"></div>
+<div class="tr"></div>
+<div class="ar"></div>
+<div class="hl"></div>
+<div class="hr"></div>
+<div class="ll"></div>
+<div class="lr"></div>
+</div>
+<span class="av-st" id="avSt">
+Waiting for input…
+</span>
+</div>
+</div>
+
+<div class="pl-st" id="plSt">
+<div class="pl-bars">
+<div class="pb"></div>
+<div class="pb"></div>
+<div class="pb"></div>
+<div class="pb"></div>
+</div>
+Playing sign animation…
+</div>
+
+<div class="ctrls">
+<button class="ctrl" id="pBtn"
+onclick="tPause()">
+<svg viewBox="0 0 24 24" id="pIco">
+<path d="M6 19h4V5H6v14zm8
+-14v14h4V5h-4z"/>
+</svg>
+<span id="pTxt">Pause</span>
+</button>
+<button class="ctrl"
+onclick="replay()">
+<svg viewBox="0 0 24 24">
+<path d="M12 5V1L7 6l5 5V7c3.31
+0 6 2.69 6 6s-2.69 6-6 6-6
+-2.69-6-6H4c0 4.42 3.58 8 8
+8s8-3.58 8-8-3.58-8-8-8z"/>
+</svg>
+Replay
+</button>
+</div>
+
+<div class="spd">
+<div class="spd-h">
+<div class="spd-l">
+Adjust signing speed
+</div>
+<div class="spd-v" id="spV">
+1.0x
+</div>
+</div>
+<input type="range"
+class="slider" id="spS"
+min="0.5" max="2"
+step="0.1" value="1"
+oninput="uSpd(this.value)">
+<div class="spd-m">
+<span>0.5x</span>
+<span>1.0x</span>
+<span>1.5x</span>
+<span>2.0x</span>
+</div>
+</div>
+</div>
+
+</div>
+
+<script>
+let micOn=false,paused=false,playing=false
+
+function toast(msg,type='info',dur=3000){
+let c=document.getElementById('tBox')
+let t=document.createElement('div')
+t.className='toast toast-'+type
+let icons={
+info:'ℹ️',success:'✅',
+error:'❌',warning:'⚠️',
+recording:'🔴'
+}
+t.innerHTML=`
+<span>${icons[type]||'ℹ️'}</span>
+<span>${msg}</span>
+<button class="toast-close"
+onclick="this.parentElement.remove()">
+✕</button>
+<div class="toast-bar"></div>`
+t.style.position='relative'
+c.appendChild(t)
+requestAnimationFrame(()=>
+t.classList.add('show'))
+t.onclick=()=>t.remove()
+setTimeout(()=>{
+t.classList.remove('show')
+setTimeout(()=>t.remove(),400)
+},dur)
+}
+
+function uSteps(n){
+for(let i=1;i<=4;i++){
+let s=document.getElementById('s'+i)
+if(i<n){
+s.className='stp dn'
+s.innerHTML='✓'
+}else if(i===n){
+s.className='stp cur'
+s.innerHTML=i
+}else{
+s.className='stp nx'
+s.innerHTML=i
+}
+}
+for(let i=1;i<=3;i++){
+let l=document.getElementById('l'+i)
+l.className=i<n?'sln dn':'sln pd'
+}
+}
+
+function hideAll(){
+['mLis','mPro','mOk','mErr']
+.forEach(id=>{
+document.getElementById(id)
+.classList.remove('show')
+})
+}
+
+function toggleMic(){
+let b=document.getElementById('mic')
+let w=document.getElementById('wav')
+let p=document.getElementById('prm')
+hideAll()
+
+if(!micOn){
+micOn=true
+b.classList.add('on')
+w.classList.add('on')
+p.textContent='Listening…'
+p.classList.add('on')
+document.getElementById('mLis')
+.classList.add('show')
+document.getElementById('liv')
+.classList.add('on')
+document.getElementById('tSt')
+.classList.add('on')
+uSteps(1)
+toast('Recording started','recording')
+
+setTimeout(()=>{
+let t=document.getElementById('tTxt')
+let wd='Hello I would like to learn sign language today'.split(' ')
+let i=0
+let iv=setInterval(()=>{
+if(i<wd.length){
+t.value+=(i>0?' ':'')+wd[i]
+uCC();i++
+}else{
+clearInterval(iv)
+toast('Transcription complete',
+'success')
+}
+},400)
+},800)
+
+setTimeout(()=>{
+hideAll()
+document.getElementById('mPro')
+.classList.add('show')
+p.textContent='Processing speech…'
+toast('Processing speech…','info')
+},3000)
+
+setTimeout(()=>{
+hideAll()
+document.getElementById('mOk')
+.classList.add('show')
+p.textContent=
+'Speech detected successfully'
+p.classList.remove('on')
+b.classList.remove('on')
+w.classList.remove('on')
+micOn=false
+document.getElementById('liv')
+.classList.remove('on')
+document.getElementById('tSt')
+.classList.remove('on')
+uSteps(2)
+toast('Speech detected!','success')
+},5000)
+
+}else{
+micOn=false
+b.classList.remove('on')
+w.classList.remove('on')
+p.textContent=
+'Tap the microphone to start speaking'
+p.classList.remove('on')
+document.getElementById('liv')
+.classList.remove('on')
+document.getElementById('tSt')
+.classList.remove('on')
+toast('Recording stopped','warning')
+}
+}
+
+function uCC(){
+let t=document.getElementById('tTxt')
+document.getElementById('cc')
+.textContent=t.value.length+' characters'
+}
+
+function selMode(m){
+document.getElementById('ksl')
+.classList.toggle('on',m==='KSL')
+document.getElementById('asl')
+.classList.toggle('on',m==='ASL')
+document.getElementById('mTxt')
+.textContent=m+' Mode Selected'
+toast(m+' Mode Selected','info')
+}
+
+function convert(){
+let inp=document.getElementById('tTxt')
+.value.trim()
+if(!inp){
+toast('No text to convert','error')
+return
+}
+let ci=document.getElementById('cIng')
+let cd=document.getElementById('cDone')
+let so=document.getElementById('sOut')
+ci.classList.remove('show')
+cd.classList.remove('show')
+so.classList.remove('show')
+uSteps(3)
+toast('Converting…','info')
+
+setTimeout(()=>ci.classList.add('show'),200)
+
+setTimeout(()=>{
+ci.classList.remove('show')
+cd.classList.add('show')
+let w=inp.split(' ').filter(x=>x)
+document.getElementById('sTxt')
+.textContent=w.map(x=>
+x.toUpperCase()).join(' → ')
+so.classList.add('show')
+uSteps(4)
+toast('Sentence generated!','success')
+},2500)
+}
+
+function tPause(){
+paused=!paused
+let b=document.getElementById('pBtn')
+let t=document.getElementById('pTxt')
+let i=document.getElementById('pIco')
+let f=document.getElementById('avF')
+
+if(paused){
+b.classList.add('act')
+t.textContent='Resume'
+i.innerHTML=
+'<path d="M8 5v14l11-7z"/>'
+f.classList.remove('go')
+toast('Paused','warning')
+}else{
+b.classList.remove('act')
+t.textContent='Pause'
+i.innerHTML=
+'<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>'
+if(playing)f.classList.add('go')
+toast('Resumed','info')
+}
+}
+
+function replay(){
+let f=document.getElementById('avF')
+let p=document.getElementById('plSt')
+let s=document.getElementById('avSt')
+
+playing=true;paused=false
+document.getElementById('pBtn')
+.classList.remove('act')
+document.getElementById('pTxt')
+.textContent='Pause'
+document.getElementById('pIco')
+.innerHTML=
+'<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>'
+
+f.classList.add('go')
+p.classList.add('show')
+s.textContent='Playing sign animation…'
+toast('Playing animation…','info')
+
+setTimeout(()=>{
+f.classList.remove('go')
+p.classList.remove('show')
+s.textContent='Animation complete'
+playing=false
+toast('Animation complete','success')
+},5000)
+}
+
+function uSpd(v){
+let val=parseFloat(v).toFixed(1)
+document.getElementById('spV')
+.textContent=val+'x'
+toast('Speed: '+val+'x','info')
+}
+</script>
+
+</body>
+</html>
